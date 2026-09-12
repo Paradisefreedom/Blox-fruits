@@ -142,44 +142,40 @@ local MyButton = LeftGroupBox:AddButton({
 	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
 })
 
-	Groupbox:AddSlider
-	Arguments: Idx, SliderOptions
+local Slider = LeftGroupBox:AddSlider("MySlider", {
+    Text = "Slider",
+    Default = 50,
+    Min = 0,
+    Max = 100,
+    Rounding = 1,
+    Compact = false,
+    Callback = function(Value)
+        print("Slider changed to:", Value)
+    end
+})
 
-	SliderOptions: {
-		Text = string,
-		Default = 50,
-		Min = 100,
-		Max = 500,
-		Suffix = string,
-		Rounding = number,
-		Compact = boolean,
-		HideMax = boolean,
-	}
+local Dropdown = LeftGroupBox:AddDropdown("MyDropdown", {
+    Values = {"Option 1", "Option 2", "Option 3"},
+    Default = 1, -- Index of the default option
+    Multi = false, -- Whether to allow multiple selections
+    Text = "Example Dropdown",
+    Tooltip = "This is a dropdown",
+    Callback = function(Value)
+        print("Dropdown new value:", Value)
+    end
+})
 
-	Text, Default, Min, Max, Rounding must be specified.
-	Suffix is optional.
-	Rounding is the number of decimal places for precision.
-
-	Compact will hide the title label of the Slider
-
-	HideMax will only display the value instead of the value & max value of the slider
-	Compact will do the same thing
-]]
-LeftGroupBox:AddSlider("MySlider", {
-	Text = "This is my slider!",
-	Default = 0,
-	Min = 0,
-	Max = 5,
-	Rounding = 1,
-	Compact = false,
-
-	Callback = function(Value)
-		print("[cb] MySlider was changed! New value:", Value)
-	end,
-
-	Tooltip = "I am a slider!", -- Information shown when you hover over the slider
-	DisabledTooltip = "I am disabled!", -- Information shown when you hover over the slider while it's disabled
-
-	Disabled = false, -- Will disable the slider (true / false)
-	Visible = true, -- Will make the slider invisible (true / false)
+-- Multi-select dropdown
+local MultiDropdown = Groupbox:AddDropdown("MyMultiDropdown", {
+    Values = {"Option A", "Option B", "Option C"},
+    Default = {"Option A"}, -- Default selected values for multi-select
+    Multi = true,
+    Text = "Multi-Select Example",
+    Callback = function(Values)
+        for Value, Selected in pairs(Values) do
+            if Selected then
+                print("Selected:", Value)
+            end
+        end
+    end
 })
