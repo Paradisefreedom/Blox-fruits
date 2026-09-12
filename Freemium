@@ -49,7 +49,7 @@ local TabBox = Tabs.Main:AddLeftTabbox() -- Add Tabbox on left side
 local Tab1 = TabBox:AddTab("Hover")
 local Tab2 = TabBox:AddTab("Teleport")
 
-local Slider = LeftTabbox:AddSlider("MySlider", {
+local Slider = Tab2:AddSlider("MySlider", {
     Text = "Slider",
     Default = 50,
     Min = 0,
