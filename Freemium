@@ -127,37 +127,29 @@ local MyButton = LeftGroupBox:AddButton({
 	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
 })
 
-local MyDisabledButton = LeftGroupBox:AddButton({
-	Text = "Disabled Button",
+local MyButton = LeftGroupBox:AddButton({
+	Text = "FPS BOOST",
 	Func = function()
-		print("You somehow clicked a disabled button!")
+		print("FPS BOOSTED")
 	end,
 	DoubleClick = false,
-	Tooltip = "This is a disabled button",
-	DisabledTooltip = "I am disabled!", -- Information shown when you hover over the button while it's disabled
-	Disabled = true,
+
+	Tooltip = "FPS BOOST",
+	DisabledTooltip = "I am disabled!",
+
+	Disabled = false, -- Will disable the button (true / false)
+	Visible = true, -- Will make the button invisible (true / false)
+	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
 })
 
---[[
-	NOTE: You can chain the button methods!
-	EXAMPLE:
-
-	LeftGroupBox:AddButton({ Text = 'Kill all', Func = Functions.KillAll, Tooltip = 'This will kill everyone in the game!' })
-		:AddButton({ Text = 'Kick all', Func = Functions.KickAll, Tooltip = 'This will kick everyone in the game!' })
-]]
-
--- Groupbox:AddLabel
--- Arguments: Text, DoesWrap, Idx
--- Arguments: Idx, Options
-LeftGroupBox:AddLabel("This is a label")
-LeftGroupBox:AddLabel("This is a label\n\nwhich wraps its text!", true)
-LeftGroupBox:AddLabel("This is a label exposed to Labels", true, "TestLabel")
-LeftGroupBox:AddLabel("SecondTestLabel", {
-	Text = "This is a label made with table options and an index",
-	DoesWrap = true, -- Defaults to false
-})
-
-LeftGroupBox:AddLabel("SecondTestLabel", {
-	Text = "This is a label that doesn't wrap it's own text",
-	DoesWrap = false, -- Defaults to false
+local Slider = Groupbox:AddSlider("MySlider", {
+    Text = "Slider",
+    Default = 50,
+    Min = 0,
+    Max = 100,
+    Rounding = 1,
+    Compact = false,
+    Callback = function(Value)
+        print("Slider changed to:", Value)
+    end
 })
