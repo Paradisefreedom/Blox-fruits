@@ -100,7 +100,7 @@ local MyButton = RightGroupBox:AddButton({
 
 local Tabs = {
 	-- MISC TAB
-	Main = Window:AddTab("Misc", "Gear"),
+	Misc = Window:AddTab("Misc", "Gear"),
 }
 
 local LeftGroupBox = Tabs.Main:AddGroupbox({
