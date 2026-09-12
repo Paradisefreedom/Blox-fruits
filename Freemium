@@ -66,25 +66,6 @@ LeftGroupBox:AddToggle("MyToggle", {
 	end,
 })
 
-LeftGroupBox:AddCheckbox("MyCheckbox", {
-	Text = "Auto Redeem Codes",
-	Tooltip = "Redeems all codes from Beebom", -- Information shown when you hover over the toggle
-	DisabledTooltip = "I am disabled!", -- Information shown when you hover over the toggle while it's disabled
-
-	Default = true, -- Default value (true / false)
-	Disabled = false, -- Will disable the toggle (true / false)
-	Visible = true, -- Will make the toggle invisible (true / false)
-	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
-
-	Callback = function(Value)
-		print("[cb] MyCheckbox changed to:", Value)
-	end,
-})
-
-Toggles.MyCheckbox:OnChanged(function()
-	print("MyCheckbox changed to:", Toggles.MyCheckbox.Value)
-end)
-
 -- 1/15/23
 -- Deprecated old way of creating buttons in favor of using a table
 -- Added DoubleClick button functionality
@@ -105,6 +86,21 @@ local MyButton = RightGroupBox:AddButton({
 	Text = "Open Magnet gacha Menu",
 	Func = function()
 		print("You clicked")
+	end,
+	DoubleClick = false,
+
+	Tooltip = "Takes you to Gacha menu (for magnet)",
+	DisabledTooltip = "I am disabled!",
+
+	Disabled = false, -- Will disable the button (true / false)
+	Visible = true, -- Will make the button invisible (true / false)
+	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
+})
+
+local MyButton = RightGroupBox:AddButton({
+	Text = "Auto Redeem Codes",
+	Func = function()
+		print("Redeemed all codes")
 	end,
 	DoubleClick = false,
 
