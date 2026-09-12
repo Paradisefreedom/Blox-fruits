@@ -24,11 +24,6 @@ local Tabs = {
 	["UI Settings"] = Window:AddTab("Config", "Gear"),
 }
 
-local Tabs = {
-	-- Creates a new tab titled Main
-	Main = Window:AddTab("Misc", "Gear"),
-}
-
 local UISettingsTab = Tabs["UI Settings"]
 
 local LeftGroupBox = Tabs.Main:AddGroupbox({
@@ -102,6 +97,21 @@ local MyButton = RightGroupBox:AddButton({
 	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
 })
 
+
+local Tabs = {
+	-- MISC TAB
+	Main = Window:AddTab("Misc", "Gear"),
+}
+
+local LeftGroupBox = Tabs.Main:AddGroupbox({
+	Side = "Left", --// (Case-insensitive),
+	Name = "Settings",
+	Description = "Codes, FPS, ETC",
+	IconName = "boxes",
+	-- Collapsed = false,
+	-- DisableCollapsing = false,
+})
+
 local MyButton = LeftGroupBox:AddButton({
 	Text = "Auto Redeem Codes",
 	Func = function()
@@ -109,7 +119,7 @@ local MyButton = LeftGroupBox:AddButton({
 	end,
 	DoubleClick = false,
 
-	Tooltip = "Takes you to Gacha menu (for magnet)",
+	Tooltip = "Redeemed all codes",
 	DisabledTooltip = "I am disabled!",
 
 	Disabled = false, -- Will disable the button (true / false)
