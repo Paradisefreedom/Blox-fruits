@@ -127,12 +127,37 @@ local MyButton = LeftGroupBox:AddButton({
 	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
 })
 
-local MyButton2 = MyButton:AddButton({
-	Text = "Sub button",
+local MyDisabledButton = LeftGroupBox:AddButton({
+	Text = "Disabled Button",
 	Func = function()
-		print("You clicked a sub button!")
+		print("You somehow clicked a disabled button!")
 	end,
-	DoubleClick = true, -- You will have to click this button twice to trigger the callback
-	Tooltip = "This is the sub button",
-	DisabledTooltip = "I am disabled!",
+	DoubleClick = false,
+	Tooltip = "This is a disabled button",
+	DisabledTooltip = "I am disabled!", -- Information shown when you hover over the button while it's disabled
+	Disabled = true,
+})
+
+--[[
+	NOTE: You can chain the button methods!
+	EXAMPLE:
+
+	LeftGroupBox:AddButton({ Text = 'Kill all', Func = Functions.KillAll, Tooltip = 'This will kill everyone in the game!' })
+		:AddButton({ Text = 'Kick all', Func = Functions.KickAll, Tooltip = 'This will kick everyone in the game!' })
+]]
+
+-- Groupbox:AddLabel
+-- Arguments: Text, DoesWrap, Idx
+-- Arguments: Idx, Options
+LeftGroupBox:AddLabel("This is a label")
+LeftGroupBox:AddLabel("This is a label\n\nwhich wraps its text!", true)
+LeftGroupBox:AddLabel("This is a label exposed to Labels", true, "TestLabel")
+LeftGroupBox:AddLabel("SecondTestLabel", {
+	Text = "This is a label made with table options and an index",
+	DoesWrap = true, -- Defaults to false
+})
+
+LeftGroupBox:AddLabel("SecondTestLabel", {
+	Text = "This is a label that doesn't wrap it's own text",
+	DoesWrap = false, -- Defaults to false
 })
