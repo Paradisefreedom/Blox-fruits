@@ -127,17 +127,12 @@ local MyButton = LeftGroupBox:AddButton({
 	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
 })
 
-local MyButton = LeftGroupBox:AddButton({
-	Text = "Boost FPS",
+local MyButton2 = MyButton:AddButton({
+	Text = "Sub button",
 	Func = function()
-		print("Boosted FPS")
+		print("You clicked a sub button!")
 	end,
-	DoubleClick = false,
-
-	Tooltip = "Boost FPS",
+	DoubleClick = true, -- You will have to click this button twice to trigger the callback
+	Tooltip = "This is the sub button",
 	DisabledTooltip = "I am disabled!",
-
-	Disabled = false, -- Will disable the button (true / false)
-	Visible = true, -- Will make the button invisible (true / false)
-	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
 })
