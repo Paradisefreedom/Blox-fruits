@@ -20,7 +20,7 @@ local Window = Library:CreateWindow({
 
 local Tabs = {
 	-- Creates a new tab titled Main
-local MainTab = Window:AddTab("Main", "home")
+	Main = Window:AddTab("Main", "user"),
 	["UI Settings"] = Window:AddTab("Config", "Gear"),
 }
 
@@ -100,10 +100,10 @@ local MyButton = RightGroupBox:AddButton({
 
 local Tabs = {
 	-- MISC TAB
-local MainTab = Window:AddTab("Misc", "user")
+	Misc = Window:AddTab("Misc", "Gear"),
 }
 
-local LeftGroupBox = Tabs.Main:AddGroupbox({
+local LeftGroupBox = Tabs.Misc:AddGroupbox({
 	Side = "Left", --// (Case-insensitive),
 	Name = "Settings",
 	Description = "Codes, FPS, ETC",
