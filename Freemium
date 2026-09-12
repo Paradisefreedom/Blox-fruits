@@ -1,0 +1,117 @@
+local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+Library.ForceCheckbox = false -- Forces AddToggle to AddCheckbox
+Library.ShowToggleFrameInKeybinds = true -- Make toggle keybinds work inside the keybinds UI (aka adds a toggle to the UI). Good for mobile users (Default value = true)
+
+local Window = Library:CreateWindow({
+
+	Title = "Hypex",
+	Footer = "version: 1.0.0",
+	Icon = 95816097006870,
+	NotifySide = "Right",
+	ShowCustomCursor = true,
+})
+
+local Tabs = {
+	-- Creates a new tab titled Main
+	Main = Window:AddTab("Main", "user"),
+	["UI Settings"] = Window:AddTab("Config", "Gear"),
+}
+
+local UISettingsTab = Tabs["UI Settings"]
+
+local LeftGroupBox = Tabs.Main:AddGroupbox({
+	Side = "Left", --// (Case-insensitive),
+	Name = "Auto Farm",
+	Description = "Auto",
+	IconName = "boxes",
+	-- Collapsed = false,
+	-- DisableCollapsing = false,
+})
+
+local RightGroupBox = Tabs.Main:AddGroupbox({
+	Side = "Right", --// (Case-insensitive),
+	Name = "Magnet",
+	Description = "Auto Farms magnet event",
+	IconName = "boxes",
+	-- Collapsed = false,
+	-- DisableCollapsing = false,
+})
+
+local TabBox = Tabs.Main:AddLeftTabbox() -- Add Tabbox on left side
+
+local Tab1 = TabBox:AddTab("Hover")
+local Tab2 = TabBox:AddTab("Teleport")
+
+-- Groupbox:AddToggle
+-- Arguments: Index, Options
+LeftGroupBox:AddToggle("MyToggle", {
+	Text = "AutoFarm",
+	Tooltip = "Auto Farm Levels", -- Information shown when you hover over the toggle
+	DisabledTooltip = "I am disabled!", -- Information shown when you hover over the toggle while it's disabled
+
+	Default = true, -- Default value (true / false)
+	Disabled = false, -- Will disable the toggle (true / false)
+	Visible = true, -- Will make the toggle invisible (true / false)
+	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
+
+	Callback = function(Value)
+		print("[cb] MyToggle changed to:", Value)
+	end,
+})
+
+LeftGroupBox:AddCheckbox("MyCheckbox", {
+	Text = "Auto Redeem Codes",
+	Tooltip = "Redeems all codes from Beebom", -- Information shown when you hover over the toggle
+	DisabledTooltip = "I am disabled!", -- Information shown when you hover over the toggle while it's disabled
+
+	Default = true, -- Default value (true / false)
+	Disabled = false, -- Will disable the toggle (true / false)
+	Visible = true, -- Will make the toggle invisible (true / false)
+	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
+
+	Callback = function(Value)
+		print("[cb] MyCheckbox changed to:", Value)
+	end,
+})
+
+Toggles.MyCheckbox:OnChanged(function()
+	print("MyCheckbox changed to:", Toggles.MyCheckbox.Value)
+end)
+
+-- 1/15/23
+-- Deprecated old way of creating buttons in favor of using a table
+-- Added DoubleClick button functionality
+
+--[[
+	Groupbox:AddButton
+	Arguments: {
+		Text = string,
+		Func = function,
+		DoubleClick = boolean
+		Tooltip = string,
+	}
+
+	You can call :AddButton on a button to add a SubButton!
+]]
+
+local MyButton = RightGroupBox:AddButton({
+	Text = "Open Magnet gacha Menu",
+	Func = function()
+		print("You clicked")
+	end,
+	DoubleClick = false,
+
+	Tooltip = "Takes you to Gacha menu (for magnet)",
+	DisabledTooltip = "I am disabled!",
+
+	Disabled = false, -- Will disable the button (true / false)
+	Visible = true, -- Will make the button invisible (true / false)
+	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
+})
