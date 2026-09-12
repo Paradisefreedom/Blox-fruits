@@ -20,7 +20,7 @@ local Window = Library:CreateWindow({
 
 local Tabs = {
 	-- Creates a new tab titled Main
-	Main = Window:AddTab("Main", "user"),
+local MainTab = Window:AddTab("Main", "home")
 	["UI Settings"] = Window:AddTab("Config", "Gear"),
 }
 
@@ -100,7 +100,7 @@ local MyButton = RightGroupBox:AddButton({
 
 local Tabs = {
 	-- MISC TAB
-	Window:AddTab(Misc, Gear),
+local MainTab = Window:AddTab("Misc", "user")
 }
 
 local LeftGroupBox = Tabs.Main:AddGroupbox({
