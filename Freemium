@@ -24,6 +24,11 @@ local Tabs = {
 	["UI Settings"] = Window:AddTab("Config", "Gear"),
 }
 
+local Tabs = {
+	-- Creates a new tab titled Main
+	Main = Window:AddTab("Misc", "Gear"),
+}
+
 local UISettingsTab = Tabs["UI Settings"]
 
 local LeftGroupBox = Tabs.Main:AddGroupbox({
@@ -97,7 +102,7 @@ local MyButton = RightGroupBox:AddButton({
 	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
 })
 
-local MyButton = RightGroupBox:AddButton({
+local MyButton = LeftGroupBox:AddButton({
 	Text = "Auto Redeem Codes",
 	Func = function()
 		print("Redeemed all codes")
