@@ -125,6 +125,15 @@ local Tabs = {
 
 local LeftGroupBox = Tabs.Misc:AddGroupbox({
 	Side = "Left", --// (Case-insensitive),
+	Name = "ESP",
+	Description = "Esp line for npcs and others",
+	IconName = "boxes",
+	-- Collapsed = false,
+	-- DisableCollapsing = false,
+})
+
+local LeftGroupBox = Tabs.Misc:AddGroupbox({
+	Side = "Left", --// (Case-insensitive),
 	Name = "Settings",
 	Description = "Codes, FPS, ETC",
 	IconName = "boxes",
@@ -162,35 +171,89 @@ local MyButton = LeftGroupBox:AddButton({
 	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
 })
 
+-- Assume LeftGroupBox is already defined in your UI library
 local MyButton = LeftGroupBox:AddButton({
-	Text = "White Screen",
-	Func = function()
-		print("Screen whitened")
-	end,
-	DoubleClick = false,
+    Text = "White Screen",
+    Func = function()
+        local player = game.Players.LocalPlayer
+        local playerGui = player:WaitForChild("PlayerGui")
+        
+        -- Check if a white screen GUI already exists
+        local whiteScreen = playerGui:FindFirstChild("WhiteScreenGui")
+        if not whiteScreen then
+            -- Create a new ScreenGui if it doesn't exist
+            whiteScreen = Instance.new("ScreenGui")
+            whiteScreen.Name = "WhiteScreenGui"
+            whiteScreen.ResetOnSpawn = false
+            whiteScreen.Parent = playerGui
 
-	Tooltip = "Makes your screen white",
-	DisabledTooltip = "I am disabled!",
+            -- Create a Frame that covers the entire screen
+            local whiteFrame = Instance.new("Frame")
+            whiteFrame.Size = UDim2.new(12, 10, 11, 10) -- Full screen
+            whiteFrame.Position = UDim2.new(0, 0, 0, 0)
+            whiteFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- White color
+            whiteFrame.BorderSizePixel = 0
+            whiteFrame.Name = "WhiteFrame"
+            whiteFrame.Parent = whiteScreen
+        end
 
-	Disabled = false, -- Will disable the button (true / false)
-	Visible = true, -- Will make the button invisible (true / false)
-	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
+        -- Toggle visibility
+        whiteScreen.Enabled = not whiteScreen.Enabled
+        if whiteScreen.Enabled then
+            print("Screen whitened")
+        else
+            print("White screen turned off")
+        end
+    end,
+    DoubleClick = false,
+    Tooltip = "Makes your screen white",
+    DisabledTooltip = "I am disabled!",
+    Disabled = false,
+    Visible = true,
+    Risky = false
 })
 
+
 local MyButton = LeftGroupBox:AddButton({
-	Text = "Black Screen",
-	Func = function()
-		print("Screen Blackened")
-	end,
-	DoubleClick = false,
+    Text = "Black Screen",
+    Func = function()
+        -- Get the local player and PlayerGui
+        local player = game.Players.LocalPlayer
+        local playerGui = player:WaitForChild("PlayerGui")
 
-	Tooltip = "Makes your screen Black",
-	DisabledTooltip = "I am disabled!",
+        -- Try to find an existing black screen overlay
+        local blackScreen = playerGui:FindFirstChild("BlackScreenOverlay")
 
-	Disabled = false, -- Will disable the button (true / false)
-	Visible = true, -- Will make the button invisible (true / false)
-	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
+        if not blackScreen then
+            -- Create a new ScreenGui
+            local screenGui = Instance.new("ScreenGui")
+            screenGui.Name = "BlackScreenOverlay"
+            screenGui.ResetOnSpawn = false
+            screenGui.IgnoreGuiInset = true
+            screenGui.Parent = playerGui
+
+            -- Create a full-screen black frame
+            local frame = Instance.new("Frame")
+            frame.Size = UDim2.new(1, 0, 1, 0)
+            frame.Position = UDim2.new(0, 0, 0, 0)
+            frame.BackgroundColor3 = Color3.new(0, 0, 0) -- Pure black
+            frame.BorderSizePixel = 0
+            frame.Parent = screenGui
+        else
+            -- Toggle visibility
+            blackScreen.Enabled = not blackScreen.Enabled
+        end
+
+        print("Screen Blackened / Toggled")
+    end,
+    DoubleClick = false,
+    Tooltip = "Makes your screen Black",
+    DisabledTooltip = "I am disabled!",
+    Disabled = false,
+    Visible = true,
+    Risky = false
 })
+
 
 local RightGroupBox = Tabs.Misc:AddGroupbox({
 	Side = "Right", --// (Case-insensitive),
@@ -202,19 +265,55 @@ local RightGroupBox = Tabs.Misc:AddGroupbox({
 })
 
 local MyButton = RightGroupBox:AddButton({
-	Text = "Server Hop",
-	Func = function()
-		print("Hopping servers")
-	end,
-	DoubleClick = false,
-
-	Tooltip = "Hopping server",
-	DisabledTooltip = "I am disabled!",
-
-	Disabled = false, -- Will disable the button (true / false)
-	Visible = true, -- Will make the button invisible (true / false)
-	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
+    Text = "Server Hop",
+    Func = function()
+        print("Hopping servers...")
+        hopServer()
+    end,
+    DoubleClick = false,
+    Tooltip = "Hopping server",
+    DisabledTooltip = "I am disabled!",
+    Disabled = false,
+    Visible = true,
+    Risky = false
 })
+
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+
+local function hopServer()
+    local gameId = game.PlaceId
+    local servers = {}
+    local cursor = ""
+
+    local function getServers()
+        local url = "https://games.roblox.com/v1/games/" .. gameId .. "/servers/Public?sortOrder=Asc&limit=100" .. (cursor ~= "" and "&cursor=" .. cursor or "")
+        local success, result = pcall(function()
+            return HttpService:JSONDecode(game:HttpGet(url))
+        end)
+        if success and result and result.data then
+            for _, server in ipairs(result.data) do
+                if server.playing < server.maxPlayers and server.id ~= game.JobId then
+                    table.insert(servers, server.id)
+                end
+            end
+            cursor = result.nextPageCursor or ""
+        end
+    end
+
+   
+    repeat
+        getServers()
+    until #servers > 0 or cursor == ""
+
+    
+    if #servers > 0 then
+        TeleportService:TeleportToPlaceInstance(gameId, servers[math.random(1, #servers)], Players.LocalPlayer)
+    else
+        warn("No available servers found to hop to.")
+    end
+end
 
 local MyButton = RightGroupBox:AddButton({
 	Text = "Full Moon",
@@ -261,12 +360,21 @@ local MyButton = RightGroupBox:AddButton({
 	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
 })
 
+local LeftGroupBox = Tabs.Misc:AddGroupbox({
+	Side = "Left", --// (Case-insensitive),
+	Name = "ESP",
+	Description = "Esp line for npcs and others",
+	IconName = "boxes",
+	-- Collapsed = false,
+	-- DisableCollapsing = false,
+})
+
 local Tabs = {
 	-- SEA EVENTS TAB
-	Sea = Window:AddTab("Sea Events", "Sea"),
+	Sea = Window:AddTab("Sea Events", "Sword"),
 }
 
-local LeftGroupBox = Tabs.Misc:AddGroupbox({
+local LeftGroupBox = Tabs.Sea:AddGroupbox({
 	Side = "Left", --// (Case-insensitive),
 	Name = "Kitsune",
 	Description = "Find, Go, Redeem",
@@ -290,14 +398,14 @@ local MyButton = LeftGroupBox:AddButton({
 	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
 })
 
-local Mybutton = LeftGroupBox:AddButton({
-    Text = "Auto Find"
-    Func = function()
-		print("Looking for Kitsune Shrine")
+local MyButton = LeftGroupBox:AddButton({
+	Text = "Auto Find",
+	Func = function()
+		print("Finding Shrine")
 	end,
 	DoubleClick = false,
 
-	Tooltip = "Look for Kitune Shrine",
+	Tooltip = "Find Shrine",
 	DisabledTooltip = "I am disabled!",
 
 	Disabled = false, -- Will disable the button (true / false)
@@ -305,14 +413,14 @@ local Mybutton = LeftGroupBox:AddButton({
 	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
 })
 
-local Mybutton = LeftGroupBox:AddButton({
-    Text = "Auto Go to Shrine"
-    Func = function()
-		print("Going for Kitsune Shrine")
+local MyButton = LeftGroupBox:AddButton({
+	Text = "Auto go to shrine",
+	Func = function()
+		print("Going to shrine")
 	end,
 	DoubleClick = false,
 
-	Tooltip = "Look for Kitune Shrine",
+	Tooltip = "Go to shrine",
 	DisabledTooltip = "I am disabled!",
 
 	Disabled = false, -- Will disable the button (true / false)
