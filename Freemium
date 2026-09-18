@@ -11,7 +11,6 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
-local VirtualInputManager = game:GetService("VirtualInputManager") 
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -25,7 +24,7 @@ Library.ShowToggleFrameInKeybinds = true
 local autoFarmEnabled = false
 local tpDelay = 10
 local hoverSpeed = 30
-local hoverHeight = 12 
+local hoverHeight = 12 -- Restored high float position
 
 -- =========================================================================
 -- 2. UI CREATION
@@ -106,7 +105,7 @@ end
 -- 4. BULLETPROOF BACKGROUND LOOPS
 -- =========================================================================
 
--- LOOP A: Movement Loop (Updated to face downward at the enemy)
+-- LOOP A: Movement Loop (Floats high above looking down)
 task.spawn(function()
     while true do
         task.wait() 
@@ -126,7 +125,6 @@ task.spawn(function()
             hrp.Anchored = true
             
             local npcPos = targetNPC.HumanoidRootPart.Position
-            -- Positions you 12 studs above, and makes your character look directly down at the NPC
             local targetCFrame = CFrame.new(npcPos + Vector3.new(0, hoverHeight, 0), npcPos)
             
             if Options.FarmMethod.Value == "Hover" then
@@ -150,7 +148,7 @@ task.spawn(function()
     end
 end)
 
--- LOOP B: Auto-Equip & Hitbox Expander Loop
+-- LOOP B: High-Reach Torso/Head Attack Loop
 task.spawn(function()
     while true do
         task.wait(0.1) 
@@ -159,10 +157,9 @@ task.spawn(function()
         
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("Humanoid") then
-            -- Dynamically finds ANY equipped tool (Sword, Melee, etc.)
+            -- Equip tool
             local combatTool = char:FindFirstChildOfClass("Tool")
             if not combatTool then
-                -- If nothing is equipped, equip the first tool in your backpack
                 local toolInBackpack = LocalPlayer.Backpack:FindFirstChildOfClass("Tool")
                 if toolInBackpack then
                     char.Humanoid:EquipTool(toolInBackpack)
@@ -171,17 +168,29 @@ task.spawn(function()
             end
             
             if combatTool then
-                -- Hitbox Expander (Reach Hack)
-                -- Makes the weapon's invisible hitbox massive so it hits the enemy from far away
-                local handle = combatTool:FindFirstChild("Handle")
-                if handle and handle:IsA("BasePart") then
-                    handle.Size = Vector3.new(30, 30, 30)
-                    handle.Transparency = 1 -- Keeps it invisible so it doesn't block your screen
-                end
+                combatTool:Activate()
                 
-                -- Simulate normal clicks to swing the massive weapon
-                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
-                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+                -- Force hit registration directly onto NPC's Head or Torso from high up
+                local targetNPC = getClosestTarget()
+                if targetNPC then
+                    local upperBodyParts = {
+                        targetNPC:FindFirstChild("Head"),
+                        targetNPC:FindFirstChild("UpperTorso"),
+                        targetNPC:FindFirstChild("Torso"),
+                        targetNPC:FindFirstChild("HumanoidRootPart")
+                    }
+                    
+                    for _, targetPart in pairs(upperBodyParts) do
+                        if targetPart and firetouchinterest then
+                            for _, toolPart in pairs(combatTool:GetDescendants()) do
+                                if toolPart:IsA("BasePart") then
+                                    firetouchinterest(toolPart, targetPart, 0)
+                                    firetouchinterest(toolPart, targetPart, 1)
+                                end
+                            end
+                        end
+                    end
+                end
             end
         end
     end
