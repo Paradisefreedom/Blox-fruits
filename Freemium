@@ -11,6 +11,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
+local VirtualInputManager = game:GetService("VirtualInputManager") -- Added to fix auto-hit safely
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -152,10 +153,12 @@ task.spawn(function()
     end
 end)
 
--- LOOP B: Auto-Equip & Fast Attack Loop (Runs forever, separated from movement)
+-- LOOP B: Auto-Equip & Fast Attack Loop 
 task.spawn(function()
     while true do
-        task.wait(0.05) -- Safe network delay (20 hits a second)
+        -- 0.1 wait time = 10 clicks per second. 
+        -- Perfectly fast for combat, perfectly safe for UI clicking.
+        task.wait(0.1) 
         
         if not autoFarmEnabled then continue end -- Skips if disabled
         
@@ -171,9 +174,12 @@ task.spawn(function()
                 end
             end
             
-            -- 2. Attack
+            -- 2. Attack using VirtualInputManager (Simulates real mouse clicks without UI freezing)
             if combatTool then
-                combatTool:Activate()
+                -- Send Mouse Down
+                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+                -- Send Mouse Up
+                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
             end
         end
     end
@@ -201,7 +207,7 @@ LeftGroupBox:AddToggle("MyToggle", {
 })
 
 -- =========================================================================
--- 6. ALL OTHER TABS AND BUTTONS (Untouched)
+-- 6. ALL OTHER TABS AND BUTTONS
 -- =========================================================================
 
 RightGroupBox:AddButton({
