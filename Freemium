@@ -24,7 +24,7 @@ Library.ShowToggleFrameInKeybinds = true
 local autoFarmEnabled = false
 local tpDelay = 10
 local hoverSpeed = 30
-local hoverHeight = 12 -- Restored high float position
+local hoverHeight = 12 
 
 -- =========================================================================
 -- 2. UI CREATION
@@ -105,7 +105,7 @@ end
 -- 4. BULLETPROOF BACKGROUND LOOPS
 -- =========================================================================
 
--- LOOP A: Movement Loop (Floats high above looking down)
+-- LOOP A: Movement Loop (Keeps you unanchored so server replication works)
 task.spawn(function()
     while true do
         task.wait() 
@@ -122,33 +122,26 @@ task.spawn(function()
         local targetNPC = getClosestTarget()
 
         if targetNPC then
-            hrp.Anchored = true
+            -- Keep unanchored, zero out velocity so you don't fall, allowing server hits
+            hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
             
             local npcPos = targetNPC.HumanoidRootPart.Position
             local targetCFrame = CFrame.new(npcPos + Vector3.new(0, hoverHeight, 0), npcPos)
             
             if Options.FarmMethod.Value == "Hover" then
-                local distance = (hrp.Position - targetCFrame.Position).Magnitude
-                local timeToTake = math.max(0.1, distance / hoverSpeed) 
-                
-                local tweenInfo = TweenInfo.new(timeToTake, Enum.EasingStyle.Linear)
-                local currentTween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
-                
-                currentTween:Play()
-                task.wait(timeToTake) 
-                
+                hrp.CFrame = targetCFrame
             elseif Options.FarmMethod.Value == "Teleport" then
                 hrp.CFrame = targetCFrame
                 task.wait(tpDelay / 10) 
             end
         else
-            hrp.Anchored = false
+            hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
             task.wait(0.5)
         end
     end
 end)
 
--- LOOP B: High-Reach Torso/Head Attack Loop
+-- LOOP B: Tool Equip & Force-Hit Loop
 task.spawn(function()
     while true do
         task.wait(0.1) 
@@ -157,20 +150,31 @@ task.spawn(function()
         
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("Humanoid") then
-            -- Equip tool
-            local combatTool = char:FindFirstChildOfClass("Tool")
-            if not combatTool then
-                local toolInBackpack = LocalPlayer.Backpack:FindFirstChildOfClass("Tool")
-                if toolInBackpack then
-                    char.Humanoid:EquipTool(toolInBackpack)
-                    combatTool = toolInBackpack
+            local combatTool = nil
+            
+            for _, item in pairs(char:GetChildren()) do
+                if item:IsA("Tool") and (item.Name:lower():find("combat") or item.Name:lower():find("melee") or item.Name:lower():find("blox")) then
+                    combatTool = item
+                    break
+                end
+            end
+            
+            if not combatTool and LocalPlayer:FindFirstChild("Backpack") then
+                for _, item in pairs(LocalPlayer.Backpack:GetChildren()) do
+                    if item:IsA("Tool") then
+                        combatTool = item
+                        break
+                    end
+                end
+                
+                if combatTool then
+                    combatTool.Parent = char 
                 end
             end
             
             if combatTool then
                 combatTool:Activate()
                 
-                -- Force hit registration directly onto NPC's Head or Torso from high up
                 local targetNPC = getClosestTarget()
                 if targetNPC then
                     local upperBodyParts = {
@@ -206,13 +210,6 @@ LeftGroupBox:AddToggle("MyToggle", {
 
     Callback = function(Value)
         autoFarmEnabled = Value
-        
-        if not autoFarmEnabled then
-            local char = LocalPlayer.Character
-            if char and char:FindFirstChild("HumanoidRootPart") then
-                char.HumanoidRootPart.Anchored = false 
-            end
-        end
     end,
 })
 
