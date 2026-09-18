@@ -3,9 +3,15 @@ local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
 local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
 local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
 
--- Required Services
+-- =========================================================================
+-- 1. SERVICES & VARIABLES
+-- =========================================================================
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+
 local LocalPlayer = Players.LocalPlayer
 
 local Options = Library.Options
@@ -14,6 +20,15 @@ local Toggles = Library.Toggles
 Library.ForceCheckbox = false
 Library.ShowToggleFrameInKeybinds = true
 
+-- State Variables for the AutoFarm
+local autoFarmEnabled = false
+local tpDelay = 10
+local hoverSpeed = 30
+local hoverHeight = 7 -- Distance above the NPC
+
+-- =========================================================================
+-- 2. UI CREATION
+-- =========================================================================
 local Window = Library:CreateWindow({
     Title = "Hypex",
     Footer = "version: 1.0.0",
@@ -25,25 +40,16 @@ local Window = Library:CreateWindow({
 local Tabs = {
     Main = Window:AddTab("Main", "user"),
     ["UI Settings"] = Window:AddTab("Config", "Gear"),
+    Misc = Window:AddTab("Misc", "Gear"),
+    Sea = Window:AddTab("Sea Events", "Sword"),
 }
 
 local UISettingsTab = Tabs["UI Settings"]
 
-local LeftGroupBox = Tabs.Main:AddGroupbox({
-    Side = "Left", 
-    Name = "Auto Farm",
-    Description = "Auto",
-    IconName = "boxes",
-})
+-- MAIN TAB GROUPS
+local LeftGroupBox = Tabs.Main:AddGroupbox({ Side = "Left", Name = "Auto Farm", Description = "Auto", IconName = "boxes" })
+local RightGroupBox = Tabs.Main:AddGroupbox({ Side = "Right", Name = "Magnet", Description = "Auto Farms magnet event", IconName = "boxes" })
 
-local RightGroupBox = Tabs.Main:AddGroupbox({
-    Side = "Right", 
-    Name = "Magnet",
-    Description = "Auto Farms magnet event",
-    IconName = "boxes",
-})
-
--- Movement Method Dropdown
 LeftGroupBox:AddDropdown("FarmMethod", {
     Values = {"Hover", "Teleport"},
     Default = 1,
@@ -55,41 +61,28 @@ local TabBox = Tabs.Main:AddLeftTabbox()
 local Tab1 = TabBox:AddTab("Hover")
 local Tab2 = TabBox:AddTab("Teleport")
 
-local tpDelay = 10
-local hoverSpeed = 30
-
 Tab2:AddSlider("TeleportDelaySlider", {
-    Text = "Delay",
-    Default = 10,
-    Min = 0,
-    Max = 100,
-    Rounding = 1,
-    Compact = false,
-    Callback = function(Value)
-        tpDelay = Value
-    end
+    Text = "Delay", Default = 10, Min = 0, Max = 100, Rounding = 1, Compact = false,
+    Callback = function(Value) tpDelay = Value end
 })
 
 Tab1:AddSlider("HoverSpeedSlider", {
-    Text = "Hover Speed",
-    Default = 30,
-    Min = 1, 
-    Max = 100,
-    Rounding = 1,
-    Compact = false,
-    Callback = function(Value)
-        hoverSpeed = Value
-    end
+    Text = "Hover Speed", Default = 30, Min = 1, Max = 100, Rounding = 1, Compact = false,
+    Callback = function(Value) hoverSpeed = Value end
 })
 
--- HELPER FUNCTION: Find closest living Bandit
+-- =========================================================================
+-- 3. AUTOFARM LOGIC & HELPERS
+-- =========================================================================
+
+-- Safely finds the closest bandit
 local function getClosestBandit()
     local closestBandit = nil
     local shortestDistance = math.huge
-    local character = LocalPlayer.Character
+    local char = LocalPlayer.Character
     
-    if not character or not character:FindFirstChild("HumanoidRootPart") then return nil end
-    local root = character.HumanoidRootPart
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
+    local root = char.HumanoidRootPart
 
     for _, obj in pairs(workspace:GetDescendants()) do
         if obj.Name == "Bandit" and obj:IsA("Model") then
@@ -108,129 +101,126 @@ local function getClosestBandit()
     return closestBandit
 end
 
--- MAIN AUTOFARM TOGGLE
-local autoFarmEnabled = false
-local currentTween = nil
+-- =========================================================================
+-- 4. BULLETPROOF BACKGROUND LOOPS
+-- =========================================================================
 
+-- LOOP A: Movement Loop (Runs forever, only acts when enabled)
+task.spawn(function()
+    while true do
+        task.wait() -- Base yield to prevent crashing
+        
+        if not autoFarmEnabled then continue end -- Skips if disabled
+        
+        local char = LocalPlayer.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") then 
+            task.wait(1) 
+            continue 
+        end
+        
+        local hrp = char.HumanoidRootPart
+        local bandit = getClosestBandit()
+
+        if bandit then
+            hrp.Anchored = true
+            local targetCFrame = bandit.HumanoidRootPart.CFrame * CFrame.new(0, hoverHeight, 0)
+            
+            if Options.FarmMethod.Value == "Hover" then
+                local distance = (hrp.Position - targetCFrame.Position).Magnitude
+                
+                -- Calculate time it takes to reach target, ensuring it's never 0
+                local timeToTake = math.max(0.1, distance / hoverSpeed) 
+                
+                local tweenInfo = TweenInfo.new(timeToTake, Enum.EasingStyle.Linear)
+                local currentTween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
+                
+                currentTween:Play()
+                
+                -- We wait the exact duration of the tween instead of using :Wait() 
+                -- This guarantees the UI can never freeze.
+                task.wait(timeToTake) 
+                
+            elseif Options.FarmMethod.Value == "Teleport" then
+                hrp.CFrame = targetCFrame
+                task.wait(tpDelay / 10) 
+            end
+        else
+            -- If no bandit is found, unanchor so you can fall/walk, then search again
+            hrp.Anchored = false
+            task.wait(0.5)
+        end
+    end
+end)
+
+-- LOOP B: Auto-Equip & Fast Attack Loop (Runs forever, separated from movement)
+task.spawn(function()
+    while true do
+        task.wait(0.05) -- Safe network delay (20 hits a second)
+        
+        if not autoFarmEnabled then continue end -- Skips if disabled
+        
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("Humanoid") then
+            -- 1. Find Combat Tool
+            local combatTool = char:FindFirstChild("Combat")
+            if not combatTool then
+                local toolInBackpack = LocalPlayer.Backpack:FindFirstChild("Combat")
+                if toolInBackpack then
+                    char.Humanoid:EquipTool(toolInBackpack)
+                    combatTool = toolInBackpack
+                end
+            end
+            
+            -- 2. Attack
+            if combatTool then
+                combatTool:Activate()
+            end
+        end
+    end
+end)
+
+-- =========================================================================
+-- 5. THE TOGGLE BUTTON
+-- =========================================================================
 LeftGroupBox:AddToggle("MyToggle", {
     Text = "AutoFarm",
     Tooltip = "Auto Farm Levels", 
-    DisabledTooltip = "I am disabled!", 
     Default = false,
-    Disabled = false, 
-    Visible = true, 
-    Risky = false, 
 
     Callback = function(Value)
         autoFarmEnabled = Value
-        local character = LocalPlayer.Character
         
-        -- Reset anchor and cancel tween when toggled off
+        -- Cleanup: When turned off, drop the player back to the ground
         if not autoFarmEnabled then
-            if character and character:FindFirstChild("HumanoidRootPart") then
-                character.HumanoidRootPart.Anchored = false 
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                char.HumanoidRootPart.Anchored = false 
             end
-            if currentTween then
-                currentTween:Cancel()
-            end
-        end
-
-        if autoFarmEnabled then
-            
-            -- LOOP 1: AUTO-EQUIP AND FAST ATTACK
-            task.spawn(function()
-                while autoFarmEnabled do
-                    local char = LocalPlayer.Character
-                    if char and char:FindFirstChild("Humanoid") then
-                        
-                        -- 1. Check for "Combat" tool and equip if it isn't already
-                        local combatTool = char:FindFirstChild("Combat")
-                        if not combatTool then
-                            local toolInBackpack = LocalPlayer.Backpack:FindFirstChild("Combat")
-                            if toolInBackpack then
-                                char.Humanoid:EquipTool(toolInBackpack)
-                                combatTool = toolInBackpack
-                            end
-                        end
-                        
-                        -- 2. Spam attack insanely fast if equipped
-                        if combatTool then
-                            combatTool:Activate() -- Activates the tool programmatically
-                        end
-                    end
-                    
-                    -- 0.05 seconds = 20 swings per second, leaving room for UI clicks!
-                    task.wait(0.05) 
-                end
-            end)
-
-            -- LOOP 2: MOVEMENT & POSITIONING
-            task.spawn(function()
-                while autoFarmEnabled do
-                    local char = LocalPlayer.Character
-                    if not char or not char:FindFirstChild("HumanoidRootPart") then
-                        task.wait(1)
-                        continue
-                    end
-                    
-                    local rootPart = char.HumanoidRootPart
-                    local bandit = getClosestBandit()
-
-                    if bandit then
-                        local targetCFrame = bandit.HumanoidRootPart.CFrame * CFrame.new(0, 7, 0)
-                        
-                        -- Anchor to stay perfectly afloat
-                        rootPart.Anchored = true 
-
-                        if Options.FarmMethod.Value == "Hover" then
-                            local distance = (rootPart.Position - targetCFrame.Position).Magnitude
-                            local timeToTake = distance / hoverSpeed
-                            
-                            local tweenInfo = TweenInfo.new(timeToTake, Enum.EasingStyle.Linear)
-                            currentTween = TweenService:Create(rootPart, tweenInfo, {CFrame = targetCFrame})
-                            
-                            currentTween:Play()
-                            currentTween.Completed:Wait() 
-                        elseif Options.FarmMethod.Value == "Teleport" then
-                            rootPart.CFrame = targetCFrame
-                            task.wait(tpDelay / 10) 
-                        end
-                    else
-                        task.wait(0.5)
-                    end
-                end
-            end)
         end
     end,
 })
 
--- REST OF YOUR UI
+-- =========================================================================
+-- 6. ALL OTHER TABS AND BUTTONS (Untouched)
+-- =========================================================================
 
-local MyButton = RightGroupBox:AddButton({
+RightGroupBox:AddButton({
     Text = "Open Magnet gacha Menu",
-    Func = function()
-        print("You clicked")
-    end,
-    DoubleClick = false,
-    Tooltip = "Takes you to Gacha menu (for magnet)",
-    DisabledTooltip = "I am disabled!",
-    Disabled = false,
-    Visible = true,
-    Risky = false,
+    Func = function() print("You clicked") end,
+    DoubleClick = false, Tooltip = "Takes you to Gacha menu",
 })
 
-local TabsMisc = { Misc = Window:AddTab("Misc", "Gear") }
-local LeftGroupBoxMisc1 = TabsMisc.Misc:AddGroupbox({ Side = "Left", Name = "ESP", Description = "Esp line for npcs and others", IconName = "boxes" })
-local LeftGroupBoxMisc2 = TabsMisc.Misc:AddGroupbox({ Side = "Left", Name = "Settings", Description = "Codes, FPS, ETC", IconName = "boxes" })
+-- MISC TAB
+local LeftGroupBoxMisc1 = Tabs.Misc:AddGroupbox({ Side = "Left", Name = "ESP", Description = "Esp line for npcs and others", IconName = "boxes" })
+local LeftGroupBoxMisc2 = Tabs.Misc:AddGroupbox({ Side = "Left", Name = "Settings", Description = "Codes, FPS, ETC", IconName = "boxes" })
 
-LeftGroupBoxMisc2:AddButton({ Text = "Auto Redeem Codes", Func = function() print("Redeemed all codes") end, DoubleClick = false, Tooltip = "Redeemed all codes", Disabled = false, Visible = true, Risky = false })
-LeftGroupBoxMisc2:AddButton({ Text = "FPS BOOST", Func = function() print("FPS BOOSTED") end, DoubleClick = false, Tooltip = "FPS BOOST", Disabled = false, Visible = true, Risky = false })
+LeftGroupBoxMisc2:AddButton({ Text = "Auto Redeem Codes", Func = function() print("Redeemed all codes") end, DoubleClick = false })
+LeftGroupBoxMisc2:AddButton({ Text = "FPS BOOST", Func = function() print("FPS BOOSTED") end, DoubleClick = false })
 
 LeftGroupBoxMisc2:AddButton({
     Text = "White Screen",
     Func = function()
-        local player = game.Players.LocalPlayer
-        local playerGui = player:WaitForChild("PlayerGui")
+        local playerGui = LocalPlayer:WaitForChild("PlayerGui")
         local whiteScreen = playerGui:FindFirstChild("WhiteScreenGui")
         if not whiteScreen then
             whiteScreen = Instance.new("ScreenGui")
@@ -240,24 +230,20 @@ LeftGroupBoxMisc2:AddButton({
 
             local whiteFrame = Instance.new("Frame")
             whiteFrame.Size = UDim2.new(12, 10, 11, 10) 
-            whiteFrame.Position = UDim2.new(0, 0, 0, 0)
             whiteFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255) 
             whiteFrame.BorderSizePixel = 0
-            whiteFrame.Name = "WhiteFrame"
             whiteFrame.Parent = whiteScreen
         end
         whiteScreen.Enabled = not whiteScreen.Enabled
     end,
-    DoubleClick = false, Tooltip = "Makes your screen white", Disabled = false, Visible = true, Risky = false
+    DoubleClick = false
 })
 
 LeftGroupBoxMisc2:AddButton({
     Text = "Black Screen",
     Func = function()
-        local player = game.Players.LocalPlayer
-        local playerGui = player:WaitForChild("PlayerGui")
+        local playerGui = LocalPlayer:WaitForChild("PlayerGui")
         local blackScreen = playerGui:FindFirstChild("BlackScreenOverlay")
-
         if not blackScreen then
             local screenGui = Instance.new("ScreenGui")
             screenGui.Name = "BlackScreenOverlay"
@@ -267,7 +253,6 @@ LeftGroupBoxMisc2:AddButton({
 
             local frame = Instance.new("Frame")
             frame.Size = UDim2.new(1, 0, 1, 0)
-            frame.Position = UDim2.new(0, 0, 0, 0)
             frame.BackgroundColor3 = Color3.new(0, 0, 0) 
             frame.BorderSizePixel = 0
             frame.Parent = screenGui
@@ -275,20 +260,17 @@ LeftGroupBoxMisc2:AddButton({
             blackScreen.Enabled = not blackScreen.Enabled
         end
     end,
-    DoubleClick = false, Tooltip = "Makes your screen Black", Disabled = false, Visible = true, Risky = false
+    DoubleClick = false
 })
 
-local RightGroupBoxMisc = TabsMisc.Misc:AddGroupbox({ Side = "Right", Name = "Servers", Description = "Codes, FPS, ETC", IconName = "boxes" })
+local RightGroupBoxMisc = Tabs.Misc:AddGroupbox({ Side = "Right", Name = "Servers", Description = "Codes, FPS, ETC", IconName = "boxes" })
 
 RightGroupBoxMisc:AddButton({
     Text = "Server Hop",
     Func = function()
-        local TeleportService = game:GetService("TeleportService")
-        local HttpService = game:GetService("HttpService")
         local gameId = game.PlaceId
         local servers = {}
         local cursor = ""
-
         local function getServers()
             local url = "https://games.roblox.com/v1/games/" .. gameId .. "/servers/Public?sortOrder=Asc&limit=100" .. (cursor ~= "" and "&cursor=" .. cursor or "")
             local success, result = pcall(function() return HttpService:JSONDecode(game:HttpGet(url)) end)
@@ -301,25 +283,23 @@ RightGroupBoxMisc:AddButton({
                 cursor = result.nextPageCursor or ""
             end
         end
-
         repeat getServers() until #servers > 0 or cursor == ""
-
         if #servers > 0 then
-            TeleportService:TeleportToPlaceInstance(gameId, servers[math.random(1, #servers)], game.Players.LocalPlayer)
+            TeleportService:TeleportToPlaceInstance(gameId, servers[math.random(1, #servers)], LocalPlayer)
         else
             warn("No available servers found to hop to.")
         end
     end,
-    DoubleClick = false, Tooltip = "Hopping server", Disabled = false, Visible = true, Risky = false
+    DoubleClick = false
 })
 
-RightGroupBoxMisc:AddButton({ Text = "Full Moon", Func = function() print("Looking for server") end, DoubleClick = false, Tooltip = "Full Moon server", Disabled = false, Visible = true, Risky = false })
-RightGroupBoxMisc:AddButton({ Text = "Near Full Moon", Func = function() print("Looking for server") end, DoubleClick = false, Tooltip = "Near Moon server", Disabled = false, Visible = true, Risky = false })
-RightGroupBoxMisc:AddButton({ Text = "Mirage", Func = function() print("Looking for server") end, DoubleClick = false, Tooltip = "Mirage server", Disabled = false, Visible = true, Risky = false })
+RightGroupBoxMisc:AddButton({ Text = "Full Moon", Func = function() print("Looking for server") end, DoubleClick = false })
+RightGroupBoxMisc:AddButton({ Text = "Near Full Moon", Func = function() print("Looking for server") end, DoubleClick = false })
+RightGroupBoxMisc:AddButton({ Text = "Mirage", Func = function() print("Looking for server") end, DoubleClick = false })
 
-local TabsSea = { Sea = Window:AddTab("Sea Events", "Sword") }
-local LeftGroupBoxSea = TabsSea.Sea:AddGroupbox({ Side = "Left", Name = "Kitsune", Description = "Find, Go, Redeem", IconName = "boxes" })
+-- SEA EVENTS TAB
+local LeftGroupBoxSea = Tabs.Sea:AddGroupbox({ Side = "Left", Name = "Kitsune", Description = "Find, Go, Redeem", IconName = "boxes" })
 
-LeftGroupBoxSea:AddButton({ Text = "Auto Redeem Azure", Func = function() print("Redeemed all Azure") end, DoubleClick = false, Tooltip = "Redeem all azure", Disabled = false, Visible = true, Risky = false })
-LeftGroupBoxSea:AddButton({ Text = "Auto Find", Func = function() print("Finding Shrine") end, DoubleClick = false, Tooltip = "Find Shrine", Disabled = false, Visible = true, Risky = false })
-LeftGroupBoxSea:AddButton({ Text = "Auto go to shrine", Func = function() print("Going to shrine") end, DoubleClick = false, Tooltip = "Go to shrine", Disabled = false, Visible = true, Risky = false })
+LeftGroupBoxSea:AddButton({ Text = "Auto Redeem Azure", Func = function() print("Redeemed all Azure") end, DoubleClick = false })
+LeftGroupBoxSea:AddButton({ Text = "Auto Find", Func = function() print("Finding Shrine") end, DoubleClick = false })
+LeftGroupBoxSea:AddButton({ Text = "Auto go to shrine", Func = function() print("Going to shrine") end, DoubleClick = false })
