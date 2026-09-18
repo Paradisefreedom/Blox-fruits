@@ -11,7 +11,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
-local VirtualInputManager = game:GetService("VirtualInputManager") -- Added to fix auto-hit safely
+local VirtualInputManager = game:GetService("VirtualInputManager") 
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -25,7 +25,7 @@ Library.ShowToggleFrameInKeybinds = true
 local autoFarmEnabled = false
 local tpDelay = 10
 local hoverSpeed = 30
-local hoverHeight = 12 -- INCREASED: Floats a good distance higher above the NPC
+local hoverHeight = 12 
 
 -- =========================================================================
 -- 2. UI CREATION
@@ -76,9 +76,9 @@ Tab1:AddSlider("HoverSpeedSlider", {
 -- 3. AUTOFARM LOGIC & HELPERS
 -- =========================================================================
 
--- Safely finds the closest bandit
-local function getClosestBandit()
-    local closestBandit = nil
+-- Safely finds the closest valid NPC (Bandit OR Trainee)
+local function getClosestTarget()
+    local closestTarget = nil
     local shortestDistance = math.huge
     local char = LocalPlayer.Character
     
@@ -86,7 +86,8 @@ local function getClosestBandit()
     local root = char.HumanoidRootPart
 
     for _, obj in pairs(workspace:GetDescendants()) do
-        if obj.Name == "Bandit" and obj:IsA("Model") then
+        -- Check if the model is named Bandit or Trainee
+        if (obj.Name == "Bandit" or obj.Name == "Trainee") and obj:IsA("Model") then
             local hum = obj:FindFirstChild("Humanoid")
             local hrp = obj:FindFirstChild("HumanoidRootPart")
             
@@ -94,12 +95,12 @@ local function getClosestBandit()
                 local distance = (hrp.Position - root.Position).Magnitude
                 if distance < shortestDistance then
                     shortestDistance = distance
-                    closestBandit = obj
+                    closestTarget = obj
                 end
             end
         end
     end
-    return closestBandit
+    return closestTarget
 end
 
 -- =========================================================================
@@ -109,9 +110,9 @@ end
 -- LOOP A: Movement Loop (Runs forever, only acts when enabled)
 task.spawn(function()
     while true do
-        task.wait() -- Base yield to prevent crashing
+        task.wait() 
         
-        if not autoFarmEnabled then continue end -- Skips if disabled
+        if not autoFarmEnabled then continue end 
         
         local char = LocalPlayer.Character
         if not char or not char:FindFirstChild("HumanoidRootPart") then 
@@ -120,25 +121,21 @@ task.spawn(function()
         end
         
         local hrp = char.HumanoidRootPart
-        local bandit = getClosestBandit()
+        local targetNPC = getClosestTarget()
 
-        if bandit then
+        if targetNPC then
             hrp.Anchored = true
-            local targetCFrame = bandit.HumanoidRootPart.CFrame * CFrame.new(0, hoverHeight, 0)
+            local targetCFrame = targetNPC.HumanoidRootPart.CFrame * CFrame.new(0, hoverHeight, 0)
             
             if Options.FarmMethod.Value == "Hover" then
                 local distance = (hrp.Position - targetCFrame.Position).Magnitude
                 
-                -- Calculate time it takes to reach target, ensuring it's never 0
                 local timeToTake = math.max(0.1, distance / hoverSpeed) 
                 
                 local tweenInfo = TweenInfo.new(timeToTake, Enum.EasingStyle.Linear)
                 local currentTween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
                 
                 currentTween:Play()
-                
-                -- We wait the exact duration of the tween instead of using :Wait() 
-                -- This guarantees the UI can never freeze.
                 task.wait(timeToTake) 
                 
             elseif Options.FarmMethod.Value == "Teleport" then
@@ -146,7 +143,6 @@ task.spawn(function()
                 task.wait(tpDelay / 10) 
             end
         else
-            -- If no bandit is found, unanchor so you can fall/walk, then search again
             hrp.Anchored = false
             task.wait(0.5)
         end
@@ -156,15 +152,12 @@ end)
 -- LOOP B: Auto-Equip & Fast Attack Loop 
 task.spawn(function()
     while true do
-        -- 0.1 wait time = 10 clicks per second. 
-        -- Perfectly fast for combat, perfectly safe for UI clicking.
         task.wait(0.1) 
         
-        if not autoFarmEnabled then continue end -- Skips if disabled
+        if not autoFarmEnabled then continue end 
         
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("Humanoid") then
-            -- 1. Find Combat Tool
             local combatTool = char:FindFirstChild("Combat")
             if not combatTool then
                 local toolInBackpack = LocalPlayer.Backpack:FindFirstChild("Combat")
@@ -174,11 +167,8 @@ task.spawn(function()
                 end
             end
             
-            -- 2. Attack using VirtualInputManager (Simulates real mouse clicks without UI freezing)
             if combatTool then
-                -- Send Mouse Down
                 VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
-                -- Send Mouse Up
                 VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
             end
         end
@@ -196,7 +186,6 @@ LeftGroupBox:AddToggle("MyToggle", {
     Callback = function(Value)
         autoFarmEnabled = Value
         
-        -- Cleanup: When turned off, drop the player back to the ground
         if not autoFarmEnabled then
             local char = LocalPlayer.Character
             if char and char:FindFirstChild("HumanoidRootPart") then
