@@ -3,6 +3,11 @@ local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
 local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
 local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
 
+-- New Services Required for AutoFarm
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
 local Options = Library.Options
 local Toggles = Library.Toggles
 
@@ -10,38 +15,45 @@ Library.ForceCheckbox = false
 Library.ShowToggleFrameInKeybinds = true
 
 local Window = Library:CreateWindow({
-
-	Title = "Hypex",
-	Footer = "version: 1.0.0",
-	Icon = 95816097006870,
-	NotifySide = "Right",
-	ShowCustomCursor = true,
+    Title = "Hypex",
+    Footer = "version: 1.0.0",
+    Icon = 95816097006870,
+    NotifySide = "Right",
+    ShowCustomCursor = true,
 })
 
 local Tabs = {
-	-- Creates a new tab titled Main
-	Main = Window:AddTab("Main", "user"),
-	["UI Settings"] = Window:AddTab("Config", "Gear"),
+    -- Creates a new tab titled Main
+    Main = Window:AddTab("Main", "user"),
+    ["UI Settings"] = Window:AddTab("Config", "Gear"),
 }
 
 local UISettingsTab = Tabs["UI Settings"]
 
 local LeftGroupBox = Tabs.Main:AddGroupbox({
-	Side = "Left", --// (Case-insensitive),
-	Name = "Auto Farm",
-	Description = "Auto",
-	IconName = "boxes",
-	-- Collapsed = false,
-	-- DisableCollapsing = false,
+    Side = "Left", --// (Case-insensitive),
+    Name = "Auto Farm",
+    Description = "Auto",
+    IconName = "boxes",
+    -- Collapsed = false,
+    -- DisableCollapsing = false,
 })
 
 local RightGroupBox = Tabs.Main:AddGroupbox({
-	Side = "Right", --// (Case-insensitive),
-	Name = "Magnet",
-	Description = "Auto Farms magnet event",
-	IconName = "boxes",
-	-- Collapsed = false,
-	-- DisableCollapsing = false,
+    Side = "Right", --// (Case-insensitive),
+    Name = "Magnet",
+    Description = "Auto Farms magnet event",
+    IconName = "boxes",
+    -- Collapsed = false,
+    -- DisableCollapsing = false,
+})
+
+-- Added Dropdown to select Movement Method
+LeftGroupBox:AddDropdown("FarmMethod", {
+    Values = {"Hover", "Teleport"},
+    Default = 1,
+    Multi = false,
+    Text = "Movement Method",
 })
 
 local TabBox = Tabs.Main:AddLeftTabbox()
@@ -49,7 +61,11 @@ local TabBox = Tabs.Main:AddLeftTabbox()
 local Tab1 = TabBox:AddTab("Hover")
 local Tab2 = TabBox:AddTab("Teleport")
 
-local Slider = Tab2:AddSlider("MySlider", {
+
+local tpDelay = 10
+local hoverSpeed = 30
+
+local Slider2 = Tab2:AddSlider("TeleportDelaySlider", {
     Text = "Delay",
     Default = 10,
     Min = 0,
@@ -57,118 +73,199 @@ local Slider = Tab2:AddSlider("MySlider", {
     Rounding = 1,
     Compact = false,
     Callback = function(Value)
-        print("Slider changed to:", Value)
+        tpDelay = Value
+        print("Delay changed to:", Value)
     end
 })
 
-local Slider = Tab1:AddSlider("MySlider", {
+local Slider1 = Tab1:AddSlider("HoverSpeedSlider", {
     Text = "Hover Speed",
     Default = 30,
-    Min = 0,
+    Min = 1, -- Set to 1 to prevent dividing by 0
     Max = 100,
     Rounding = 1,
     Compact = false,
     Callback = function(Value)
-        print("Slider changed to:", Value)
+        hoverSpeed = Value
+        print("Hover Speed changed to:", Value)
     end
 })
 
--- Groupbox:AddToggle
--- Arguments: Index, Options
+-- HELPER FUNCTION: Find closest living Bandit
+local function getClosestBandit()
+    local closestBandit = nil
+    local shortestDistance = math.huge
+    local character = LocalPlayer.Character
+    
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return nil end
+    local root = character.HumanoidRootPart
+
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj.Name == "Bandit" and obj:IsA("Model") then
+            local hum = obj:FindFirstChild("Humanoid")
+            local hrp = obj:FindFirstChild("HumanoidRootPart")
+            
+            if hum and hrp and hum.Health > 0 then
+                local distance = (hrp.Position - root.Position).Magnitude
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    closestBandit = obj
+                end
+            end
+        end
+    end
+    return closestBandit
+end
+
+-- MAIN AUTOFARM TOGGLE
+local autoFarmEnabled = false
+local currentTween = nil
+
 LeftGroupBox:AddToggle("MyToggle", {
-	Text = "AutoFarm",
-	Tooltip = "Auto Farm Levels", -- Information shown when you hover over the toggle
-	DisabledTooltip = "I am disabled!", -- Information shown when you hover over the toggle while it's disabled
+    Text = "AutoFarm",
+    Tooltip = "Auto Farm Levels", 
+    DisabledTooltip = "I am disabled!", 
 
-	Default = true, -- Default value (true / false)
-	Disabled = false, -- Will disable the toggle (true / false)
-	Visible = true, -- Will make the toggle invisible (true / false)
-	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
+    Default = false,
+    Disabled = false, 
+    Visible = true, 
+    Risky = false, 
 
-	Callback = function(Value)
-		print("[cb] MyToggle changed to:", Value)
-	end,
+    Callback = function(Value)
+        autoFarmEnabled = Value
+        print("[cb] AutoFarm changed to:", Value)
+        
+        local character = LocalPlayer.Character
+        
+        -- Reset anchor and cancel tween when toggled off
+        if not autoFarmEnabled then
+            if character and character:FindFirstChild("HumanoidRootPart") then
+                character.HumanoidRootPart.Anchored = false 
+            end
+            if currentTween then
+                currentTween:Cancel()
+            end
+        end
+
+        if autoFarmEnabled then
+            task.spawn(function()
+                while autoFarmEnabled do
+                    local char = LocalPlayer.Character
+                    if not char or not char:FindFirstChild("HumanoidRootPart") then
+                        task.wait(1)
+                        continue
+                    end
+                    
+                    local rootPart = char.HumanoidRootPart
+                    local bandit = getClosestBandit()
+
+                    if bandit then
+                        local targetCFrame = bandit.HumanoidRootPart.CFrame * CFrame.new(0, 7, 0)
+                        
+                        -- Anchoring prevents dragging on the ground while hovering
+                        rootPart.Anchored = true 
+
+                        if Options.FarmMethod.Value == "Hover" then
+                            local distance = (rootPart.Position - targetCFrame.Position).Magnitude
+                            local timeToTake = distance / hoverSpeed
+                            
+                            local tweenInfo = TweenInfo.new(timeToTake, Enum.EasingStyle.Linear)
+                            currentTween = TweenService:Create(rootPart, tweenInfo, {CFrame = targetCFrame})
+                            
+                            currentTween:Play()
+                            currentTween.Completed:Wait() 
+                        elseif Options.FarmMethod.Value == "Teleport" then
+                            rootPart.CFrame = targetCFrame
+                            task.wait(tpDelay / 10) 
+                        end
+                    else
+                        task.wait(0.5)
+                    end
+                end
+            end)
+        end
+    end,
 })
 
 --[[
-	Groupbox:AddButton
-	Arguments: {
-		Text = string,
-		Func = function,
-		DoubleClick = boolean
-		Tooltip = string,
-	}
+    Groupbox:AddButton
+    Arguments: {
+        Text = string,
+        Func = function,
+        DoubleClick = boolean
+        Tooltip = string,
+    }
 
-	You can call :AddButton on a button to add a SubButton!
+    You can call :AddButton on a button to add a SubButton!
 ]]
 
 local MyButton = RightGroupBox:AddButton({
-	Text = "Open Magnet gacha Menu",
-	Func = function()
-		print("You clicked")
-	end,
-	DoubleClick = false,
+    Text = "Open Magnet gacha Menu",
+    Func = function()
+        print("You clicked")
+    end,
+    DoubleClick = false,
 
-	Tooltip = "Takes you to Gacha menu (for magnet)",
-	DisabledTooltip = "I am disabled!",
+    Tooltip = "Takes you to Gacha menu (for magnet)",
+    DisabledTooltip = "I am disabled!",
 
-	Disabled = false, -- Will disable the button (true / false)
-	Visible = true, -- Will make the button invisible (true / false)
-	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
+    Disabled = false, -- Will disable the button (true / false)
+    Visible = true, -- Will make the button invisible (true / false)
+    Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
 })
 
 
 local Tabs = {
-	-- MISC TAB
-	Misc = Window:AddTab("Misc", "Gear"),
+    -- MISC TAB
+    Misc = Window:AddTab("Misc", "Gear"),
 }
 
 local LeftGroupBox = Tabs.Misc:AddGroupbox({
-	Side = "Left", --// (Case-insensitive),
-	Name = "ESP",
-	Description = "Esp line for npcs and others",
-	IconName = "boxes",
-	-- Collapsed = false,
-	-- DisableCollapsing = false,
+    Side = "Left", --// (Case-insensitive),
+    Name = "ESP",
+    Description = "Esp line for npcs and others",
+    IconName = "boxes",
+    -- Collapsed = false,
+    -- DisableCollapsing = false,
 })
 
 local LeftGroupBox = Tabs.Misc:AddGroupbox({
-	Side = "Left", --// (Case-insensitive),
-	Name = "Settings",
-	Description = "Codes, FPS, ETC",
-	IconName = "boxes",
-	-- Collapsed = false,
-	-- DisableCollapsing = false,
+    Side = "Left", --// (Case-insensitive),
+    Name = "Settings",
+    Description = "Codes, FPS, ETC",
+    IconName = "boxes",
+    -- Collapsed = false,
+    -- DisableCollapsing = false,
 })
 
 local MyButton = LeftGroupBox:AddButton({
-	Text = "Auto Redeem Codes",
-	Func = function()
-		print("Redeemed all codes")
-	end,
-	DoubleClick = false,
+    Text = "Auto Redeem Codes",
+    Func = function()
+        print("Redeemed all codes")
+    end,
+    DoubleClick = false,
 
-	Tooltip = "Redeemed all codes",
-	DisabledTooltip = "I am disabled!",
+    Tooltip = "Redeemed all codes",
+    DisabledTooltip = "I am disabled!",
 
-	Disabled = false, -- Will disable the button (true / false)
-	Visible = true, -- Will make the button invisible (true / false)
-	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
+    Disabled = false, -- Will disable the button (true / false)
+    Visible = true, -- Will make the button invisible (true / false)
+    Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
 })
 
 local MyButton = LeftGroupBox:AddButton({
-	Text = "FPS BOOST",
-	Func = function()
-		print("FPS BOOSTED")
-	end,
-	DoubleClick = false,
+    Text = "FPS BOOST",
+    Func = function()
+        print("FPS BOOSTED")
+    end,
+    DoubleClick = false,
 
-	Tooltip = "FPS BOOST",
-	DisabledTooltip = "I am disabled!",
+    Tooltip = "FPS BOOST",
+    DisabledTooltip = "I am disabled!",
 
-	Disabled = false, -- Will disable the button (true / false)
-	Visible = true, -- Will make the button invisible (true / false)
-	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
+    Disabled = false, -- Will disable the button (true / false)
+    Visible = true, -- Will make the button invisible (true / false)
+    Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
 })
 
 -- Assume LeftGroupBox is already defined in your UI library
@@ -256,12 +353,12 @@ local MyButton = LeftGroupBox:AddButton({
 
 
 local RightGroupBox = Tabs.Misc:AddGroupbox({
-	Side = "Right", --// (Case-insensitive),
-	Name = "Servers",
-	Description = "Codes, FPS, ETC",
-	IconName = "boxes",
-	-- Collapsed = false,
-	-- DisableCollapsing = false,
+    Side = "Right", --// (Case-insensitive),
+    Name = "Servers",
+    Description = "Codes, FPS, ETC",
+    IconName = "boxes",
+    -- Collapsed = false,
+    -- DisableCollapsing = false,
 })
 
 local MyButton = RightGroupBox:AddButton({
@@ -316,114 +413,114 @@ local function hopServer()
 end
 
 local MyButton = RightGroupBox:AddButton({
-	Text = "Full Moon",
-	Func = function()
-		print("Looking for server")
-	end,
-	DoubleClick = false,
+    Text = "Full Moon",
+    Func = function()
+        print("Looking for server")
+    end,
+    DoubleClick = false,
 
-	Tooltip = "Full Moon server",
-	DisabledTooltip = "I am disabled!",
+    Tooltip = "Full Moon server",
+    DisabledTooltip = "I am disabled!",
 
-	Disabled = false, -- Will disable the button (true / false)
-	Visible = true, -- Will make the button invisible (true / false)
-	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
+    Disabled = false, -- Will disable the button (true / false)
+    Visible = true, -- Will make the button invisible (true / false)
+    Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
 })
 
 local MyButton = RightGroupBox:AddButton({
-	Text = "Near Full Moon",
-	Func = function()
-		print("Looking for server")
-	end,
-	DoubleClick = false,
+    Text = "Near Full Moon",
+    Func = function()
+        print("Looking for server")
+    end,
+    DoubleClick = false,
 
-	Tooltip = "Near Moon server",
-	DisabledTooltip = "I am disabled!",
+    Tooltip = "Near Moon server",
+    DisabledTooltip = "I am disabled!",
 
-	Disabled = false, -- Will disable the button (true / false)
-	Visible = true, -- Will make the button invisible (true / false)
-	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
+    Disabled = false, -- Will disable the button (true / false)
+    Visible = true, -- Will make the button invisible (true / false)
+    Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
 })
 
 local MyButton = RightGroupBox:AddButton({
-	Text = "Mirage",
-	Func = function()
-		print("Looking for server")
-	end,
-	DoubleClick = false,
+    Text = "Mirage",
+    Func = function()
+        print("Looking for server")
+    end,
+    DoubleClick = false,
 
-	Tooltip = "Mirage server",
-	DisabledTooltip = "I am disabled!",
+    Tooltip = "Mirage server",
+    DisabledTooltip = "I am disabled!",
 
-	Disabled = false, -- Will disable the button (true / false)
-	Visible = true, -- Will make the button invisible (true / false)
-	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
+    Disabled = false, -- Will disable the button (true / false)
+    Visible = true, -- Will make the button invisible (true / false)
+    Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
 })
 
 local LeftGroupBox = Tabs.Misc:AddGroupbox({
-	Side = "Left", --// (Case-insensitive),
-	Name = "ESP",
-	Description = "Esp line for npcs and others",
-	IconName = "boxes",
-	-- Collapsed = false,
-	-- DisableCollapsing = false,
+    Side = "Left", --// (Case-insensitive),
+    Name = "ESP",
+    Description = "Esp line for npcs and others",
+    IconName = "boxes",
+    -- Collapsed = false,
+    -- DisableCollapsing = false,
 })
 
 local Tabs = {
-	-- SEA EVENTS TAB
-	Sea = Window:AddTab("Sea Events", "Sword"),
+    -- SEA EVENTS TAB
+    Sea = Window:AddTab("Sea Events", "Sword"),
 }
 
 local LeftGroupBox = Tabs.Sea:AddGroupbox({
-	Side = "Left", --// (Case-insensitive),
-	Name = "Kitsune",
-	Description = "Find, Go, Redeem",
-	IconName = "boxes",
-	-- Collapsed = false,
-	-- DisableCollapsing = false,
+    Side = "Left", --// (Case-insensitive),
+    Name = "Kitsune",
+    Description = "Find, Go, Redeem",
+    IconName = "boxes",
+    -- Collapsed = false,
+    -- DisableCollapsing = false,
 })
 
 local MyButton = LeftGroupBox:AddButton({
-	Text = "Auto Redeem Azure",
-	Func = function()
-		print("Redeemed all Azure")
-	end,
-	DoubleClick = false,
+    Text = "Auto Redeem Azure",
+    Func = function()
+        print("Redeemed all Azure")
+    end,
+    DoubleClick = false,
 
-	Tooltip = "Redeem all azure",
-	DisabledTooltip = "I am disabled!",
+    Tooltip = "Redeem all azure",
+    DisabledTooltip = "I am disabled!",
 
-	Disabled = false, -- Will disable the button (true / false)
-	Visible = true, -- Will make the button invisible (true / false)
-	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
+    Disabled = false, -- Will disable the button (true / false)
+    Visible = true, -- Will make the button invisible (true / false)
+    Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
 })
 
 local MyButton = LeftGroupBox:AddButton({
-	Text = "Auto Find",
-	Func = function()
-		print("Finding Shrine")
-	end,
-	DoubleClick = false,
+    Text = "Auto Find",
+    Func = function()
+        print("Finding Shrine")
+    end,
+    DoubleClick = false,
 
-	Tooltip = "Find Shrine",
-	DisabledTooltip = "I am disabled!",
+    Tooltip = "Find Shrine",
+    DisabledTooltip = "I am disabled!",
 
-	Disabled = false, -- Will disable the button (true / false)
-	Visible = true, -- Will make the button invisible (true / false)
-	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
+    Disabled = false, -- Will disable the button (true / false)
+    Visible = true, -- Will make the button invisible (true / false)
+    Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
 })
 
 local MyButton = LeftGroupBox:AddButton({
-	Text = "Auto go to shrine",
-	Func = function()
-		print("Going to shrine")
-	end,
-	DoubleClick = false,
+    Text = "Auto go to shrine",
+    Func = function()
+        print("Going to shrine")
+    end,
+    DoubleClick = false,
 
-	Tooltip = "Go to shrine",
-	DisabledTooltip = "I am disabled!",
+    Tooltip = "Go to shrine",
+    DisabledTooltip = "I am disabled!",
 
-	Disabled = false, -- Will disable the button (true / false)
-	Visible = true, -- Will make the button invisible (true / false)
-	Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
+    Disabled = false, -- Will disable the button (true / false)
+    Visible = true, -- Will make the button invisible (true / false)
+    Risky = false, -- Makes the text red (the color can be changed using Library.Scheme.Red) (Default value = false)
 })
