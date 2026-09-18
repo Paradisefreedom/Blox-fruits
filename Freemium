@@ -86,7 +86,6 @@ local function getClosestTarget()
     local root = char.HumanoidRootPart
 
     for _, obj in pairs(workspace:GetDescendants()) do
-        -- Check if the model is named Bandit or Trainee
         if (obj.Name == "Bandit" or obj.Name == "Trainee") and obj:IsA("Model") then
             local hum = obj:FindFirstChild("Humanoid")
             local hrp = obj:FindFirstChild("HumanoidRootPart")
@@ -107,7 +106,7 @@ end
 -- 4. BULLETPROOF BACKGROUND LOOPS
 -- =========================================================================
 
--- LOOP A: Movement Loop (Runs forever, only acts when enabled)
+-- LOOP A: Movement Loop (Updated to face downward at the enemy)
 task.spawn(function()
     while true do
         task.wait() 
@@ -125,11 +124,13 @@ task.spawn(function()
 
         if targetNPC then
             hrp.Anchored = true
-            local targetCFrame = targetNPC.HumanoidRootPart.CFrame * CFrame.new(0, hoverHeight, 0)
+            
+            local npcPos = targetNPC.HumanoidRootPart.Position
+            -- Positions you 12 studs above, and makes your character look directly down at the NPC
+            local targetCFrame = CFrame.new(npcPos + Vector3.new(0, hoverHeight, 0), npcPos)
             
             if Options.FarmMethod.Value == "Hover" then
                 local distance = (hrp.Position - targetCFrame.Position).Magnitude
-                
                 local timeToTake = math.max(0.1, distance / hoverSpeed) 
                 
                 local tweenInfo = TweenInfo.new(timeToTake, Enum.EasingStyle.Linear)
@@ -149,7 +150,7 @@ task.spawn(function()
     end
 end)
 
--- LOOP B: Auto-Equip & Fast Attack Loop 
+-- LOOP B: Auto-Equip & Hitbox Expander Loop
 task.spawn(function()
     while true do
         task.wait(0.1) 
@@ -158,9 +159,11 @@ task.spawn(function()
         
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("Humanoid") then
-            local combatTool = char:FindFirstChild("Combat")
+            -- Dynamically finds ANY equipped tool (Sword, Melee, etc.)
+            local combatTool = char:FindFirstChildOfClass("Tool")
             if not combatTool then
-                local toolInBackpack = LocalPlayer.Backpack:FindFirstChild("Combat")
+                -- If nothing is equipped, equip the first tool in your backpack
+                local toolInBackpack = LocalPlayer.Backpack:FindFirstChildOfClass("Tool")
                 if toolInBackpack then
                     char.Humanoid:EquipTool(toolInBackpack)
                     combatTool = toolInBackpack
@@ -168,6 +171,15 @@ task.spawn(function()
             end
             
             if combatTool then
+                -- Hitbox Expander (Reach Hack)
+                -- Makes the weapon's invisible hitbox massive so it hits the enemy from far away
+                local handle = combatTool:FindFirstChild("Handle")
+                if handle and handle:IsA("BasePart") then
+                    handle.Size = Vector3.new(30, 30, 30)
+                    handle.Transparency = 1 -- Keeps it invisible so it doesn't block your screen
+                end
+                
+                -- Simulate normal clicks to swing the massive weapon
                 VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
                 VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
             end
