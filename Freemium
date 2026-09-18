@@ -25,7 +25,7 @@ Library.ShowToggleFrameInKeybinds = true
 local autoFarmEnabled = false
 local tpDelay = 10
 local hoverSpeed = 30
-local hoverHeight = 7 -- Distance above the NPC
+local hoverHeight = 12 -- INCREASED: Floats a good distance higher above the NPC
 
 -- =========================================================================
 -- 2. UI CREATION
