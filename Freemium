@@ -3,10 +3,9 @@ local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
 local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
 local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
 
--- New Services Required for AutoFarm & Fast Attacking
+-- Required Services
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
-local VirtualUser = game:GetService("VirtualUser") -- Added to simulate fast clicking
 local LocalPlayer = Players.LocalPlayer
 
 local Options = Library.Options
@@ -157,15 +156,11 @@ LeftGroupBox:AddToggle("MyToggle", {
                         -- 2. Spam attack insanely fast if equipped
                         if combatTool then
                             combatTool:Activate() -- Activates the tool programmatically
-                            
-                            -- Fallback: Simulates a physical mouse click in case the game blocks :Activate()
-                            VirtualUser:CaptureController()
-                            VirtualUser:ClickButton1(Vector2.new(0,0))
                         end
                     end
                     
-                    -- No number inside task.wait() forces it to run on every single frame
-                    task.wait() 
+                    -- 0.05 seconds = 20 swings per second, leaving room for UI clicks!
+                    task.wait(0.05) 
                 end
             end)
 
@@ -209,7 +204,8 @@ LeftGroupBox:AddToggle("MyToggle", {
     end,
 })
 
--- (The rest of your script for Misc, Servers, ESP, Black Screen, etc. remains untouched below)
+-- REST OF YOUR UI
+
 local MyButton = RightGroupBox:AddButton({
     Text = "Open Magnet gacha Menu",
     Func = function()
